@@ -1,0 +1,180 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 31 41 55; /* #1f2937 - Dark gray background */
+  --foreground: 255 255 255; /* #ffffff - Pure white text */
+  --muted: 55 65 81; /* #374151 - Slightly lighter gray */
+  --muted-foreground: 209 213 219; /* #d1d5db - Light gray text */
+  --popover: 31 41 55; /* #1f2937 - Dark gray background */
+  --popover-foreground: 255 255 255; /* #ffffff - Pure white text */
+  --card: 55 65 81; /* #374151 - Card background */
+  --card-foreground: 255 255 255; /* #ffffff - Pure white text */
+  --border: 107 114 128; /* #6b7280 - Border color */
+  --input: 55 65 81; /* #374151 - Input background */
+  --primary: 255 107 0; /* #ff6b00 - NoMercy Orange */
+  --primary-foreground: 255 255 255; /* #ffffff */
+  --secondary: 55 65 81; /* #374151 - Secondary gray */
+  --secondary-foreground: 255 255 255; /* #ffffff */
+  --accent: 255 107 0; /* #ff6b00 - NoMercy Orange */
+  --accent-foreground: 255 255 255; /* #ffffff */
+  --destructive: 239 68 68; /* #ef4444 - Red */
+  --destructive-foreground: 255 255 255; /* #ffffff */
+  --ring: 255 107 0; /* #ff6b00 - NoMercy Orange */
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 31 41 55;
+  --foreground: 255 255 255;
+  --muted: 55 65 81;
+  --muted-foreground: 209 213 219;
+  --popover: 55 65 81;
+  --popover-foreground: 255 255 255;
+  --card: 55 65 81;
+  --card-foreground: 255 255 255;
+  --border: 107 114 128;
+  --input: 55 65 81;
+  --primary: 255 107 0;
+  --primary-foreground: 255 255 255;
+  --secondary: 55 65 81;
+  --secondary-foreground: 255 255 255;
+  --accent: 255 107 0;
+  --accent-foreground: 255 255 255;
+  --destructive: 239 68 68;
+  --destructive-foreground: 255 255 255;
+  --ring: 255 107 0;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+    background-color: rgb(31 41 55) !important; /* Force dark gray background */
+    color: rgb(255 255 255) !important; /* Force white text */
+  }
+
+  html {
+    background-color: rgb(31 41 55) !important;
+  }
+}
+
+@layer utilities {
+  .glow-effect {
+    box-shadow: 0 0 20px rgba(255, 107, 0, 0.6);
+  }
+
+  .bottom-sheet {
+    transform: translateY(100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .bottom-sheet.active {
+    transform: translateY(0);
+  }
+
+  .hamburger-menu {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .hamburger-menu.active {
+    transform: translateX(0);
+  }
+}
+
+/* Force consistent styling across all components */
+.bg-card {
+  background-color: rgb(55 65 81) !important;
+  color: rgb(255 255 255) !important;
+}
+
+.bg-background {
+  background-color: rgb(31 41 55) !important;
+  color: rgb(255 255 255) !important;
+}
+
+.text-foreground {
+  color: rgb(255 255 255) !important;
+}
+
+.text-muted-foreground {
+  color: rgb(209 213 219) !important;
+}
+
+.bg-primary {
+  background-color: rgb(255 107 0) !important;
+  color: rgb(255 255 255) !important;
+}
+
+.text-primary {
+  color: rgb(255 107 0) !important;
+}
+
+.border-border {
+  border-color: rgb(107 114 128) !important;
+}
+
+.bg-secondary {
+  background-color: rgb(55 65 81) !important;
+  color: rgb(255 255 255) !important;
+}
+
+/* Form inputs styling */
+input, textarea, select {
+  background-color: rgb(55 65 81) !important;
+  color: rgb(255 255 255) !important;
+  border-color: rgb(107 114 128) !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: rgb(156 163 175) !important;
+}
+
+/* Button styling */
+button {
+  color: rgb(255 255 255) !important;
+}
+
+.text-orange-500 {
+  color: rgb(255 107 0) !important;
+}
+
+.hover\:text-orange-400:hover {
+  color: rgb(251 146 60) !important;
+}
+
+.hover\:text-orange-500:hover {
+  color: rgb(255 107 0) !important;
+}
+
+.bg-orange-500 {
+  background-color: rgb(255 107 0) !important;
+}
+
+.hover\:bg-orange-600:hover {
+  background-color: rgb(234 88 12) !important;
+}
+
+/* Card and component overrides */
+div, section, main {
+  background-color: inherit;
+  color: inherit;
+}
+
+/* Navigation specific */
+header {
+  background-color: rgb(55 65 81) !important;
+  border-color: rgb(107 114 128) !important;
+}
+
+nav {
+  background-color: rgb(55 65 81) !important;
+  border-color: rgb(107 114 128) !important;
+}
