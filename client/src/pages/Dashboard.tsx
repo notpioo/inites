@@ -1,10 +1,34 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trophy, Users, Gamepad2, TrendingUp } from "lucide-react";
+import { Users, Trophy, Gamepad2, TrendingUp, Globe } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export default function Dashboard() {
-  const { userProfile } = useAuth();
+  const { currentUser, userProfile, loading, isAuthenticated } = useAuth();
+  const [stats, setStats] = useState({
+    totalMembers: 0,
+    activeTournaments: 0,
+    onlineUsers: 0,
+    userPoints: 0
+  });
+
+  useEffect(() => {
+    // Simulate fetching stats - replace with actual API calls
+    setStats({
+      totalMembers: 1247, // Total registered members
+      activeTournaments: 8, // Active tournaments
+      onlineUsers: 156, // Currently online users
+      userPoints: userProfile?.points || 0 // User's personal points
+    });
+  }, [userProfile]);
+
+  // This is now handled by ProtectedRoute, so we can remove this useEffect
+
+  // Render loading state
+  if (loading) {
+    return <div className="min-h-screen bg-background text-foreground p-4 pb-20">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 pb-20">
@@ -12,7 +36,7 @@ export default function Dashboard() {
         {/* Welcome Section */}
         <div className="text-center space-y-4 mb-8">
           <h1 className="text-3xl font-bold text-foreground">
-            Welcome back, <span className="text-primary">{userProfile?.fullName || userProfile?.username} !</span>
+            Welcome back, <span className="text-primary">{userProfile?.fullName || userProfile?.username}!</span>
           </h1>
           <p className="text-muted-foreground text-lg">
             Ready to dominate today's challenges?
@@ -25,8 +49,20 @@ export default function Dashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Rank</p>
-                  <p className="text-2xl font-bold text-primary">#42</p>
+                  <p className="text-sm text-muted-foreground">Total Member</p>
+                  <p className="text-2xl font-bold text-primary">{stats.totalMembers.toLocaleString()}</p>
+                </div>
+                <Users className="w-8 h-8 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-primary hover:glow-effect transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Aktif Tournament</p>
+                  <p className="text-2xl font-bold text-foreground">{stats.activeTournaments}</p>
                 </div>
                 <Trophy className="w-8 h-8 text-primary" />
               </div>
@@ -37,22 +73,10 @@ export default function Dashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Wins</p>
-                  <p className="text-2xl font-bold text-foreground">0</p>
+                  <p className="text-sm text-muted-foreground">Online</p>
+                  <p className="text-2xl font-bold text-foreground">{stats.onlineUsers}</p>
                 </div>
-                <Trophy className="w-8 h-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-primary hover:glow-effect transition-all">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Games</p>
-                  <p className="text-2xl font-bold text-foreground">0</p>
-                </div>
-                <Gamepad2 className="w-8 h-8 text-primary" />
+                <Globe className="w-8 h-8 text-primary" />
               </div>
             </CardContent>
           </Card>
@@ -62,7 +86,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Points</p>
-                  <p className="text-2xl font-bold text-foreground">0</p>
+                  <p className="text-2xl font-bold text-foreground">{stats.userPoints.toLocaleString()}</p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-primary" />
               </div>

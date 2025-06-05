@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { signUp } from "@/lib/auth";
 import { getUserByUsername } from "@/lib/firestore";
 import { UserPlus, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const registerSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
@@ -31,6 +32,14 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { isAuthenticated, loading } = useAuth();
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      setLocation("/dashboard");
+    }
+  }, [loading, isAuthenticated, setLocation]);
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),

@@ -1,4 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -37,7 +39,59 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  const httpServer = createServer(app);
+  const io = new Server(httpServer, {
+    cors: {
+      origin: process.env.NODE_ENV === "production" ? false : ["http://localhost:5173"],
+      methods: ["GET", "POST"]
+    }
+  });
+
+  // Socket.IO connection handling
+  const onlineUsers = new Map<string, string>(); // socketId -> userId
+
+  io.on("connection", (socket) => {
+    console.log("User connected:", socket.id);
+
+    socket.on("user-online", (userId: string) => {
+      onlineUsers.set(socket.id, userId);
+      io.emit("online-users", Array.from(onlineUsers.values()));
+      log(`User ${userId} is now online`);
+    });
+
+    socket.on("join-conversation", (conversationId: string) => {
+      socket.join(conversationId);
+      log(`Socket ${socket.id} joined conversation ${conversationId}`);
+    });
+
+    socket.on("leave-conversation", (conversationId: string) => {
+      socket.leave(conversationId);
+      log(`Socket ${socket.id} left conversation ${conversationId}`);
+    });
+
+    socket.on("send-message", (data: {
+      conversationId: string;
+      message: any;
+    }) => {
+      socket.to(data.conversationId).emit("new-message", data.message);
+    });
+
+    socket.on("typing", (data: { conversationId: string; userId: string; isTyping: boolean }) => {
+      socket.to(data.conversationId).emit("user-typing", data);
+    });
+
+    socket.on("disconnect", () => {
+      const userId = onlineUsers.get(socket.id);
+      if (userId) {
+        onlineUsers.delete(socket.id);
+        io.emit("online-users", Array.from(onlineUsers.values()));
+        log(`User ${userId} is now offline`);
+      }
+      console.log("User disconnected:", socket.id);
+    });
+  });
+
+  const server = await registerRoutes(app, httpServer);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

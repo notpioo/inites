@@ -50,15 +50,15 @@ export const BottomNav = ({ onMoreClick }: BottomNavProps) => {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => handleNavClick("/dashboard")}
+          onClick={() => handleNavClick("/social")} // Modified: Link to /social
           className={`flex flex-col items-center space-y-1 px-3 py-2 h-auto ${
             location.includes("social")
               ? "text-orange-500"
               : "text-gray-400 hover:text-orange-500"
           }`}
         >
-          <Users className="w-5 h-5" />
-          <span className="text-xs">Social</span>
+          <Users className="w-5 h-5" /> {/* Modified: Use Users icon for Social */}
+          <span className="text-xs">Social</span> {/* Modified: Label as Social */}
         </Button>
 
         <Button

@@ -31,7 +31,7 @@ export const BottomSheet = ({ isOpen, onClose }: BottomSheetProps) => {
     { icon: Layers, label: "Division", path: "/dashboard" },
     { icon: Medal, label: "Leaderboard", path: "/dashboard" },
     { icon: Trophy, label: "Tournament", path: "/dashboard" },
-    { icon: Users, label: "Social", path: "/dashboard" },
+    { icon: Users, label: "Profile", path: "/profile" },
     { icon: Store, label: "Store", path: "/dashboard" },
     { icon: Settings, label: "Settings", path: "/dashboard" },
     { icon: HelpCircle, label: "Help", path: "/dashboard" },

@@ -44,7 +44,7 @@ export const Navigation = ({ onHamburgerClick }: NavigationProps) => {
             >
               <Menu className="w-5 h-5" />
             </Button>
-            <Link href="/" className="flex items-center space-x-3">
+            <Link href="/dashboard" className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <Gamepad2 className="w-5 h-5 text-primary-foreground" />
               </div>
@@ -62,9 +62,19 @@ export const Navigation = ({ onHamburgerClick }: NavigationProps) => {
                   {userProfile.fullName}
                 </span>
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
+                  <Link href="/profile">
+                    <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-orange-400 transition-all">
+                      {userProfile.profilePicture ? (
+                        <img 
+                          src={userProfile.profilePicture} 
+                          alt="Profile" 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-4 h-4 text-white" />
+                      )}
+                    </div>
+                  </Link>
                   <Button
                     variant="ghost"
                     size="sm"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { signIn } from "@/lib/auth";
 import { getUserByUsername } from "@/lib/firestore";
 import { Gamepad2, Eye, EyeOff } from "lucide-react";
@@ -26,6 +27,14 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { isAuthenticated, loading } = useAuth();
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      setLocation("/dashboard");
+    }
+  }, [loading, isAuthenticated, setLocation]);
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -55,7 +64,10 @@ export default function Login() {
         description: "You have successfully signed in.",
       });
 
-      setLocation("/dashboard");
+      // Wait a bit for auth state to update before redirecting
+      setTimeout(() => {
+        setLocation("/dashboard");
+      }, 100);
     } catch (error: any) {
       toast({
         title: "Sign in failed",
