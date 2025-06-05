@@ -5,18 +5,16 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
+COPY tsconfig*.json ./
 
-# Install all dependencies (including devDependencies for build)
+# Install all dependencies
 RUN npm ci
 
 # Copy source code
 COPY . .
 
-# Build the client only
-RUN npm run build:client
-
-# Copy server files
-COPY server ./server
+# Build client and server
+RUN npm run build
 
 # Remove devDependencies after build
 RUN npm ci --only=production && npm cache clean --force
