@@ -91,12 +91,12 @@ app.use((req, res, next) => {
       messageId: string;
       senderId: string;
       content: string;
-      type: string;
+      type?: string;
       createdAt: any;
     }) => {
       console.log("Broadcasting message:", data);
-      // Broadcast to other users in conversation room
-      socket.to(`conversation_${data.conversationId}`).emit("new-message", {
+      
+      const messagePayload = {
         id: data.messageId,
         messageId: data.messageId,
         conversationId: data.conversationId,
@@ -104,7 +104,15 @@ app.use((req, res, next) => {
         content: data.content,
         type: data.type || 'text',
         createdAt: data.createdAt
-      });
+      };
+      
+      // Broadcast to other users in conversation room
+      socket.to(`conversation_${data.conversationId}`).emit("new-message", messagePayload);
+      
+      // Also broadcast to all users in the conversation for backup
+      io.to(`conversation_${data.conversationId}`).except(socket.id).emit("new-message", messagePayload);
+      
+      console.log(`Message ${data.messageId} broadcasted to conversation ${data.conversationId}`);
     });
 
     socket.on("typing", (data: { conversationId: string; userId: string; isTyping: boolean }) => {
@@ -139,15 +147,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  // Use PORT from environment or default to 5000
+  const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
+  server.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
   });
 })();

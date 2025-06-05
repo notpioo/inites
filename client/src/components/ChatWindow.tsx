@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,30 +31,28 @@ export default function ChatWindow() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  // Set chat mode when component mounts
-  React.useEffect(() => {
+  // Set chat mode on mount
+  useEffect(() => {
     localStorage.setItem('inChatMode', 'true');
-    // Hide bottom navigation
-    const bottomNav = document.querySelector('.bottom-nav');
-    if (bottomNav) {
-      (bottomNav as HTMLElement).style.display = 'none';
-    }
-    
+
+    // Force re-render of BottomNav by dispatching storage event
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'inChatMode',
+      newValue: 'true'
+    }));
+
     return () => {
+      // Clean up on unmount
       localStorage.removeItem('inChatMode');
-      // Show bottom navigation when leaving chat
-      const bottomNav = document.querySelector('.bottom-nav');
-      if (bottomNav) {
-        (bottomNav as HTMLElement).style.display = 'flex';
-      }
-      
-      // Clean up socket connection
-      if (socket && socket.connected && currentConversation) {
-        socket.emit("leave-conversation", currentConversation.id);
-      }
+
+      // Force re-render of BottomNav
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'inChatMode',
+        newValue: null
+      }));
     };
-  }, [socket, currentConversation]);
-  
+  }, []);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -78,10 +75,10 @@ export default function ChatWindow() {
     if (!currentConversation) return;
 
     console.log('Loading messages for conversation:', currentConversation.id);
-    
+
     const unsubscribe = getMessages(currentConversation.id, async (loadedMessages) => {
       console.log('Loaded messages:', loadedMessages);
-      
+
       // Get sender info for each message
       const messagesWithSenderInfo = await Promise.all(
         loadedMessages.map(async (message) => {
@@ -97,7 +94,7 @@ export default function ChatWindow() {
           };
         })
       );
-      
+
       console.log('Messages with sender info:', messagesWithSenderInfo);
       setMessages(messagesWithSenderInfo);
     });
@@ -107,7 +104,7 @@ export default function ChatWindow() {
 
   // Socket event handlers
   useEffect(() => {
-    if (!socket || !currentConversation || !currentUser || !socket.connected) return;
+    if (!socket || !currentConversation || !currentUser) return;
 
     console.log('Setting up socket listeners for conversation:', currentConversation.id);
 
@@ -119,37 +116,44 @@ export default function ChatWindow() {
       }
     };
 
+    // Join conversation when connected
     if (socket.connected) {
       joinConversation();
-    } else {
-      socket.on('connect', joinConversation);
     }
 
     // Handle new messages from other users only
     const handleNewMessage = (messageData: any) => {
       console.log("Received new message via socket:", messageData);
-      
-      // Only add message if it's from another user to avoid duplicates
-      if (messageData.senderId !== currentUser.uid) {
+
+      // Only add message if it's from another user and for this conversation
+      if (messageData.senderId !== currentUser.uid && messageData.conversationId === currentConversation.id) {
         const sender = friends.find(f => f.firebaseUid === messageData.senderId);
         const messageObj = {
-          id: messageData.messageId || messageData.id || `msg_${Date.now()}`,
+          id: messageData.messageId || messageData.id || `socket_${Date.now()}_${Math.random()}`,
           conversationId: messageData.conversationId,
           senderId: messageData.senderId,
           content: messageData.content,
           type: messageData.type || 'text',
-          createdAt: messageData.createdAt || new Date(),
+          createdAt: messageData.createdAt ? new Date(messageData.createdAt) : new Date(),
           senderInfo: {
             fullName: sender?.fullName || messageData.senderName || 'Unknown User',
             profilePicture: sender?.profilePicture
           }
         };
-        
+
         console.log('Adding new message to state:', messageObj);
         setMessages(prev => {
           // Check if message already exists to prevent duplicates
-          const exists = prev.some(msg => msg.id === messageObj.id);
-          if (exists) return prev;
+          const exists = prev.some(msg => 
+            (msg.id === messageObj.id) || 
+            (msg.senderId === messageObj.senderId && 
+             msg.content === messageObj.content && 
+             Math.abs(new Date(msg.createdAt).getTime() - new Date(messageObj.createdAt).getTime()) < 1000)
+          );
+          if (exists) {
+            console.log('Message already exists, skipping');
+            return prev;
+          }
           return [...prev, messageObj];
         });
       }
@@ -158,7 +162,7 @@ export default function ChatWindow() {
     // Handle typing indicators
     const handleUserTyping = (data: { userId: string; isTyping: boolean; conversationId: string }) => {
       console.log('User typing event:', data);
-      
+
       if (data.userId !== currentUser.uid && data.conversationId === currentConversation.id) {
         setTypingUsers(prev => 
           data.isTyping 
@@ -183,21 +187,18 @@ export default function ChatWindow() {
     socket.on("new-message", handleNewMessage);
     socket.on("user-typing", handleUserTyping);
 
-    // Also listen for message events
-    socket.on("message", handleNewMessage);
-    socket.on("receive-message", handleNewMessage);
-
     return () => {
       console.log('Cleaning up socket listeners');
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("new-message", handleNewMessage);
       socket.off("user-typing", handleUserTyping);
-      socket.off("message", handleNewMessage);
-      socket.off("receive-message", handleNewMessage);
-      socket.emit("leave-conversation", currentConversation.id);
+
+      if (socket.connected) {
+        socket.emit("leave-conversation", currentConversation.id);
+      }
     };
-  }, [socket, currentConversation, currentUser, friends]);
+  }, [socket, currentConversation, currentUser?.uid, friends]);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -208,8 +209,8 @@ export default function ChatWindow() {
     if (!newMessage.trim() || !currentUser || !currentConversation) return;
 
     const messageContent = newMessage.trim();
-    const tempId = `temp_${Date.now()}`;
-    
+    const tempId = `temp_${Date.now()}_${currentUser.uid}`;
+
     // Add message optimistically to UI
     const optimisticMessage = {
       id: tempId,
@@ -222,10 +223,10 @@ export default function ChatWindow() {
         fullName: 'You'
       }
     };
-    
+
     setMessages(prev => [...prev, optimisticMessage]);
     setNewMessage(""); // Clear input immediately for better UX
-    
+
     try {
       console.log('Sending message to Firestore...');
       const messageId = await sendMessage(
@@ -233,7 +234,7 @@ export default function ChatWindow() {
         currentUser.uid,
         messageContent
       );
-      
+
       console.log('Message saved to Firestore with ID:', messageId);
 
       // Update the optimistic message with real ID
@@ -251,22 +252,22 @@ export default function ChatWindow() {
           senderId: currentUser.uid,
           content: messageContent,
           type: 'text',
-          createdAt: new Date(),
-          senderName: 'You'
+          createdAt: new Date().toISOString()
         };
-        
+
         console.log("Sending message via socket:", socketData);
-        
-        // Try multiple event names for compatibility
         socket.emit("send-message", socketData);
-        socket.emit("new-message", socketData);
-        socket.emit("message", socketData);
       } else {
         console.warn('Socket not connected, message will not be sent in real-time');
+
+        // Try to reconnect socket if not connected
+        if (socket && !socket.connected) {
+          socket.connect();
+        }
       }
 
       setIsTyping(false);
-      
+
       // Stop typing indicator
       if (socket && socket.connected) {
         socket.emit("typing", {
@@ -275,14 +276,14 @@ export default function ChatWindow() {
           isTyping: false
         });
       }
-      
+
     } catch (error) {
       console.error("Error sending message:", error);
-      
+
       // Remove optimistic message on error
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
       setNewMessage(messageContent); // Restore message on error
-      
+
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",
@@ -339,21 +340,21 @@ export default function ChatWindow() {
           onClick={() => {
             // Clean up chat mode
             localStorage.removeItem('inChatMode');
-            
+
             // Show bottom navigation
             const bottomNav = document.querySelector('.bottom-nav');
             if (bottomNav) {
               (bottomNav as HTMLElement).style.display = 'flex';
             }
-            
+
             // Leave conversation room
             if (socket && socket.connected && currentConversation) {
               socket.emit("leave-conversation", currentConversation.id);
             }
-            
+
             // Clear conversation
             setCurrentConversation(null);
-            
+
             // Navigate without refresh
             setLocation('/social');
           }}
@@ -408,8 +409,8 @@ export default function ChatWindow() {
                     <div
                       className={`rounded-lg p-3 ${
                         isOwn 
-                          ? 'bg-primary text-primary-foreground' 
-                          : 'bg-muted'
+                          ? 'bg-orange-500 text-white' 
+                          : 'bg-gray-700 text-white'
                       }`}
                     >
                       {!isOwn && (
@@ -418,7 +419,7 @@ export default function ChatWindow() {
                         </p>
                       )}
                       <p className="text-sm">{message.content}</p>
-                      <p className={`text-xs mt-1 ${isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                      <p className={`text-xs mt-1 ${isOwn ? 'text-white/70' : 'text-gray-300'}`}>
                         {formatMessageTime(message.createdAt)}
                       </p>
                     </div>

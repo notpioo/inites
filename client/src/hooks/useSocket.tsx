@@ -34,8 +34,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         forceNew: false,
         reconnection: true,
         reconnectionDelay: 1000,
-        reconnectionAttempts: 5,
-        maxReconnectionAttempts: 5,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 10,
+        maxReconnectionAttempts: 10,
+        randomizationFactor: 0.5,
         autoConnect: true
       });
 
