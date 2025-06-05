@@ -174,7 +174,7 @@ export const getFriendRequests = (userId: string, callback: (requests: any[]) =>
         const senderRef = doc(db, "users", requestData.fromUserId);
         const senderSnap = await getDoc(senderRef);
         const senderData = senderSnap.exists() ? senderSnap.data() : null;
-        
+
         return {
           id: docSnap.id,
           ...requestData,
@@ -246,11 +246,13 @@ export const getFriends = (userId: string, callback: (friends: User[]) => void) 
 };
 
 // Group System Functions
-export const createGroup = async (groupData: Omit<Group, 'id' | 'memberCount' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+export const createGroup = async (name: string, description: string, createdBy: string): Promise<string> => {
   try {
     const groupRef = collection(db, "groups");
     const docRef = await addDoc(groupRef, {
-      ...groupData,
+      name,
+      description,
+      createdBy,
       memberCount: 1,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -260,7 +262,7 @@ export const createGroup = async (groupData: Omit<Group, 'id' | 'memberCount' | 
     const memberRef = collection(db, "groupMembers");
     await addDoc(memberRef, {
       groupId: docRef.id,
-      userId: groupData.createdBy,
+      userId: createdBy,
       role: 'admin',
       joinedAt: serverTimestamp()
     });
@@ -353,19 +355,19 @@ export const getUserConversations = (userId: string, callback: (conversations: a
       id: doc.id,
       ...doc.data()
     }));
-    
+
     // Sort by lastMessageAt in memory
     conversations.sort((a, b) => {
       if (!a.lastMessageAt && !b.lastMessageAt) return 0;
       if (!a.lastMessageAt) return 1;
       if (!b.lastMessageAt) return -1;
-      
+
       const aTime = a.lastMessageAt.toDate ? a.lastMessageAt.toDate() : new Date(a.lastMessageAt);
       const bTime = b.lastMessageAt.toDate ? b.lastMessageAt.toDate() : new Date(b.lastMessageAt);
-      
+
       return bTime.getTime() - aTime.getTime();
     });
-    
+
     callback(conversations);
   });
 };
@@ -459,3 +461,54 @@ export const searchUsers = async (searchTerm: string): Promise<User[]> => {
     throw error;
   }
 };
+
+export const searchGroups = async (searchTerm: string): Promise<Group[]> => {
+  try {
+    const groupsRef = collection(db, "groups");
+    const q = query(
+      groupsRef,
+      where("name", ">=", searchTerm),
+      where("name", "<=", searchTerm + '\uf8ff'),
+      limit(10)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Group));
+  } catch (error) {
+    console.error("Error searching groups:", error);
+    throw error;
+  }
+};
+
+// Friend Request Functions
+export const acceptFriendRequest = async (requestId: string) => {
+  const requestRef = doc(db, 'friendRequests', requestId);
+  const requestSnap = await getDoc(requestRef);
+
+  if (!requestSnap.exists()) {
+    throw new Error('Friend request not found');
+  }
+
+  const requestData = requestSnap.data();
+
+  // Create friendship
+  await addDoc(collection(db, 'friendships'), {
+    user1Id: requestData.fromUserId,
+    user2Id: requestData.toUserId,
+    status: 'active',
+    createdAt: new Date()
+  });
+
+  // Delete the friend request
+  await deleteDoc(requestRef);
+};
+
+export const declineFriendRequest = async (requestId: string) => {
+  const requestRef = doc(db, 'friendRequests', requestId);
+  await deleteDoc(requestRef);
+};
+
+export { db };

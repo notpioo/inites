@@ -81,11 +81,39 @@ const SocialContext = createContext<SocialContextType | undefined>(undefined);
 
 export function SocialProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Recover current conversation from sessionStorage on page refresh
+  useEffect(() => {
+    // Only recover if we're not already in chat mode and no current conversation
+    const isInChatMode = localStorage.getItem('inChatMode') === 'true';
+    const savedConversation = sessionStorage.getItem('currentConversation');
+    
+    if (savedConversation && !currentConversation && isInChatMode) {
+      try {
+        const parsed = JSON.parse(savedConversation);
+        setCurrentConversation(parsed);
+      } catch (error) {
+        console.error('Error parsing saved conversation:', error);
+        sessionStorage.removeItem('currentConversation');
+      }
+    }
+  }, [currentConversation]);
+
+  // Save current conversation to sessionStorage
+  useEffect(() => {
+    if (currentConversation) {
+      sessionStorage.setItem('currentConversation', JSON.stringify(currentConversation));
+    } else {
+      sessionStorage.removeItem('currentConversation');
+    }
+  }, [currentConversation]);
+
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState({
     friends: true,
     groups: true,

@@ -17,37 +17,84 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (currentUser && !socket) {
+      console.log('Connecting socket for user:', currentUser.uid);
 
-    const newSocket = io(window.location.origin, {
-      auth: {
-        userId: currentUser.uid
-      }
-    });
+      // Use current domain for socket connection
+      const socketUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:5000' 
+        : window.location.origin;
 
-    setSocket(newSocket);
+      const newSocket = io(socketUrl, {
+        auth: {
+          userId: currentUser.uid
+        },
+        transports: ['websocket', 'polling'],
+        timeout: 20000,
+        forceNew: false,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
+        maxReconnectionAttempts: 5,
+        autoConnect: true
+      });
 
-    newSocket.on("connect", () => {
-      setIsConnected(true);
-      // Authenticate user when connected
-      newSocket.emit("authenticate", currentUser.uid);
-      console.log("Connected to socket server");
-    });
+      newSocket.on('connect', () => {
+        console.log('Socket connected:', newSocket.id);
+        setSocket(newSocket);
+        setIsConnected(true);
+        // Authenticate after connection
+        newSocket.emit('authenticate', currentUser.uid);
+      });
 
-    newSocket.on("disconnect", () => {
-      setIsConnected(false);
-      console.log("Disconnected from socket server");
-    });
+      newSocket.on('disconnect', (reason) => {
+        console.log('Socket disconnected:', reason);
+        setIsConnected(false);
+        setSocket(null);
+      });
 
-    newSocket.on("online-users", (users: string[]) => {
-      setOnlineUsers(users);
-      console.log("Online users updated:", users);
-    });
+      newSocket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+        setIsConnected(false);
+      });
 
+      newSocket.on('online-users', (users: string[]) => {
+        console.log('Online users:', users);
+        setOnlineUsers(users);
+      });
+
+      newSocket.on('user-connected', (userId: string) => {
+        console.log('User connected:', userId);
+        setOnlineUsers(prev => prev.includes(userId) ? prev : [...prev, userId]);
+      });
+
+      newSocket.on('user-disconnected', (userId: string) => {
+        console.log('User disconnected:', userId);
+        setOnlineUsers(prev => prev.filter(id => id !== userId));
+      });
+
+      setSocket(newSocket);
+
+      return () => {
+        console.log('Cleaning up socket connection');
+        newSocket.removeAllListeners();
+        newSocket.close();
+        setSocket(null);
+        setIsConnected(false);
+        setOnlineUsers([]);
+      };
+    }
+
+    // Cleanup when user changes or component unmounts
     return () => {
-      newSocket.close();
-      setSocket(null);
-      setIsConnected(false);
+      if (socket) {
+        console.log('Cleaning up existing socket');
+        socket.removeAllListeners();
+        socket.disconnect();
+        setSocket(null);
+        setIsConnected(false);
+        setOnlineUsers([]);
+      }
     };
   }, [currentUser]);
 

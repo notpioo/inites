@@ -40,11 +40,25 @@ app.use((req, res, next) => {
 
 (async () => {
   const httpServer = createServer(app);
+  
+  // Register routes first
+  const server = await registerRoutes(app, httpServer);
+  
+  // Initialize Socket.IO after routes
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.NODE_ENV === "production" ? false : ["http://localhost:5173"],
-      methods: ["GET", "POST"]
-    }
+      origin: process.env.NODE_ENV === "production" 
+        ? false 
+        : ["http://localhost:5173", "https://*.replit.dev", "https://*.replit.app"],
+      methods: ["GET", "POST"],
+      credentials: true
+    },
+    allowEIO3: true,
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    upgradeTimeout: 30000,
+    maxHttpBufferSize: 1e6
   });
 
   // Socket.IO connection handling
@@ -107,8 +121,6 @@ app.use((req, res, next) => {
       console.log("User disconnected:", socket.id);
     });
   });
-
-  const server = await registerRoutes(app, httpServer);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -43,6 +42,11 @@ function Router() {
           <Social />
         </ProtectedRoute>
       </Route>
+      <Route path="/admin">
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -51,61 +55,34 @@ function Router() {
 function App() {
   const [isHamburgerOpen, setIsHamburgerOpen] = useState(false);
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
-  const [location] = useLocation();
-
-  // Register service worker for PWA
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then((registration) => {
-          console.log('SW registered: ', registration);
-        })
-        .catch((registrationError) => {
-          console.log('SW registration failed: ', registrationError);
-        });
-    });
-  }
-
-  // Check if we're in a chat room (when ChatWindow is displayed)
-  const isInChatMode = localStorage.getItem('inChatMode') === 'true';
-  const showNavigation = location !== "/" && !isInChatMode;
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <SocketProvider>
+      <TooltipProvider>
+        <AuthProvider>
           <SocialProvider>
-            <TooltipProvider>
+            <SocketProvider>
               <div className="min-h-screen bg-background text-foreground">
-                {showNavigation && (
-                  <Navigation onHamburgerClick={() => setIsHamburgerOpen(true)} />
-                )}
-
-                <main>
-                  <Router />
-                </main>
-
-                {showNavigation && (
-                  <BottomNav onMoreClick={() => setIsBottomSheetOpen(true)} />
-                )}
-
+                <Navigation onHamburgerClick={() => setIsHamburgerOpen(true)} />
                 <HamburgerMenu 
                   isOpen={isHamburgerOpen} 
                   onClose={() => setIsHamburgerOpen(false)} 
                 />
-
+                <main className="pb-20 lg:pb-0">
+                  <Router />
+                </main>
+                <BottomNav onMoreClick={() => setIsBottomSheetOpen(true)} />
                 <BottomSheet 
                   isOpen={isBottomSheetOpen} 
                   onClose={() => setIsBottomSheetOpen(false)} 
                 />
-
                 <PWAPrompt />
                 <Toaster />
               </div>
-            </TooltipProvider>
+            </SocketProvider>
           </SocialProvider>
-        </SocketProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

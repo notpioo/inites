@@ -10,6 +10,7 @@ import { useSocket } from "@/hooks/useSocket";
 import { useSocial } from "@/hooks/useSocial";
 import { sendMessage, getMessages } from "@/lib/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 interface Message {
   id: string;
@@ -29,14 +30,31 @@ export default function ChatWindow() {
   const { socket, onlineUsers } = useSocket();
   const { currentConversation, setCurrentConversation, friends } = useSocial();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   // Set chat mode when component mounts
   React.useEffect(() => {
     localStorage.setItem('inChatMode', 'true');
+    // Hide bottom navigation
+    const bottomNav = document.querySelector('.bottom-nav');
+    if (bottomNav) {
+      (bottomNav as HTMLElement).style.display = 'none';
+    }
+    
     return () => {
       localStorage.removeItem('inChatMode');
+      // Show bottom navigation when leaving chat
+      const bottomNav = document.querySelector('.bottom-nav');
+      if (bottomNav) {
+        (bottomNav as HTMLElement).style.display = 'flex';
+      }
+      
+      // Clean up socket connection
+      if (socket && socket.connected && currentConversation) {
+        socket.emit("leave-conversation", currentConversation.id);
+      }
     };
-  }, []);
+  }, [socket, currentConversation]);
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -59,7 +77,11 @@ export default function ChatWindow() {
   useEffect(() => {
     if (!currentConversation) return;
 
+    console.log('Loading messages for conversation:', currentConversation.id);
+    
     const unsubscribe = getMessages(currentConversation.id, async (loadedMessages) => {
+      console.log('Loaded messages:', loadedMessages);
+      
       // Get sender info for each message
       const messagesWithSenderInfo = await Promise.all(
         loadedMessages.map(async (message) => {
@@ -75,6 +97,8 @@ export default function ChatWindow() {
           };
         })
       );
+      
+      console.log('Messages with sender info:', messagesWithSenderInfo);
       setMessages(messagesWithSenderInfo);
     });
 
@@ -83,37 +107,59 @@ export default function ChatWindow() {
 
   // Socket event handlers
   useEffect(() => {
-    if (!socket || !currentConversation) return;
+    if (!socket || !currentConversation || !currentUser || !socket.connected) return;
 
-    // Join conversation room
-    socket.emit("join-conversation", currentConversation.id);
-    console.log("Joined conversation:", currentConversation.id);
+    console.log('Setting up socket listeners for conversation:', currentConversation.id);
+
+    // Wait for socket to be connected before joining
+    const joinConversation = () => {
+      if (socket.connected) {
+        socket.emit("join-conversation", currentConversation.id);
+        console.log("Joined conversation:", currentConversation.id);
+      }
+    };
+
+    if (socket.connected) {
+      joinConversation();
+    } else {
+      socket.on('connect', joinConversation);
+    }
 
     // Handle new messages from other users only
     const handleNewMessage = (messageData: any) => {
-      console.log("Received new message:", messageData);
+      console.log("Received new message via socket:", messageData);
+      
       // Only add message if it's from another user to avoid duplicates
-      if (messageData.senderId !== currentUser?.uid) {
+      if (messageData.senderId !== currentUser.uid) {
         const sender = friends.find(f => f.firebaseUid === messageData.senderId);
         const messageObj = {
-          id: messageData.messageId || messageData.id,
+          id: messageData.messageId || messageData.id || `msg_${Date.now()}`,
           conversationId: messageData.conversationId,
           senderId: messageData.senderId,
           content: messageData.content,
           type: messageData.type || 'text',
-          createdAt: messageData.createdAt,
+          createdAt: messageData.createdAt || new Date(),
           senderInfo: {
             fullName: sender?.fullName || messageData.senderName || 'Unknown User',
             profilePicture: sender?.profilePicture
           }
         };
-        setMessages(prev => [...prev, messageObj]);
+        
+        console.log('Adding new message to state:', messageObj);
+        setMessages(prev => {
+          // Check if message already exists to prevent duplicates
+          const exists = prev.some(msg => msg.id === messageObj.id);
+          if (exists) return prev;
+          return [...prev, messageObj];
+        });
       }
     };
 
     // Handle typing indicators
-    const handleUserTyping = (data: { userId: string; isTyping: boolean }) => {
-      if (data.userId !== currentUser?.uid) {
+    const handleUserTyping = (data: { userId: string; isTyping: boolean; conversationId: string }) => {
+      console.log('User typing event:', data);
+      
+      if (data.userId !== currentUser.uid && data.conversationId === currentConversation.id) {
         setTypingUsers(prev => 
           data.isTyping 
             ? [...prev.filter(id => id !== data.userId), data.userId]
@@ -122,12 +168,33 @@ export default function ChatWindow() {
       }
     };
 
+    // Handle connection status
+    const handleConnect = () => {
+      console.log('Socket connected, rejoining conversation');
+      socket.emit("join-conversation", currentConversation.id);
+    };
+
+    const handleDisconnect = () => {
+      console.log('Socket disconnected');
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
     socket.on("new-message", handleNewMessage);
     socket.on("user-typing", handleUserTyping);
 
+    // Also listen for message events
+    socket.on("message", handleNewMessage);
+    socket.on("receive-message", handleNewMessage);
+
     return () => {
+      console.log('Cleaning up socket listeners');
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
       socket.off("new-message", handleNewMessage);
       socket.off("user-typing", handleUserTyping);
+      socket.off("message", handleNewMessage);
+      socket.off("receive-message", handleNewMessage);
       socket.emit("leave-conversation", currentConversation.id);
     };
   }, [socket, currentConversation, currentUser, friends]);
@@ -141,43 +208,84 @@ export default function ChatWindow() {
     if (!newMessage.trim() || !currentUser || !currentConversation) return;
 
     const messageContent = newMessage.trim();
+    const tempId = `temp_${Date.now()}`;
+    
+    // Add message optimistically to UI
+    const optimisticMessage = {
+      id: tempId,
+      conversationId: currentConversation.id,
+      senderId: currentUser.uid,
+      content: messageContent,
+      type: 'text' as const,
+      createdAt: new Date(),
+      senderInfo: {
+        fullName: 'You'
+      }
+    };
+    
+    setMessages(prev => [...prev, optimisticMessage]);
     setNewMessage(""); // Clear input immediately for better UX
     
     try {
+      console.log('Sending message to Firestore...');
       const messageId = await sendMessage(
         currentConversation.id,
         currentUser.uid,
         messageContent
       );
+      
+      console.log('Message saved to Firestore with ID:', messageId);
+
+      // Update the optimistic message with real ID
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempId 
+          ? { ...msg, id: messageId }
+          : msg
+      ));
 
       // Emit to socket for real-time updates to other users
-      if (socket) {
-        console.log("Sending message via socket:", {
+      if (socket && socket.connected) {
+        const socketData = {
           conversationId: currentConversation.id,
           messageId,
           senderId: currentUser.uid,
           content: messageContent,
           type: 'text',
-          createdAt: new Date()
-        });
+          createdAt: new Date(),
+          senderName: 'You'
+        };
         
-        socket.emit("send-message", {
-          conversationId: currentConversation.id,
-          messageId,
-          senderId: currentUser.uid,
-          content: messageContent,
-          type: 'text',
-          createdAt: new Date()
-        });
+        console.log("Sending message via socket:", socketData);
+        
+        // Try multiple event names for compatibility
+        socket.emit("send-message", socketData);
+        socket.emit("new-message", socketData);
+        socket.emit("message", socketData);
+      } else {
+        console.warn('Socket not connected, message will not be sent in real-time');
       }
 
       setIsTyping(false);
+      
+      // Stop typing indicator
+      if (socket && socket.connected) {
+        socket.emit("typing", {
+          conversationId: currentConversation.id,
+          userId: currentUser.uid,
+          isTyping: false
+        });
+      }
+      
     } catch (error) {
       console.error("Error sending message:", error);
+      
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
       setNewMessage(messageContent); // Restore message on error
+      
       toast({
         title: "Error",
-        description: "Failed to send message",
+        description: "Failed to send message. Please try again.",
         variant: "destructive"
       });
     }
@@ -229,8 +337,25 @@ export default function ChatWindow() {
           variant="ghost"
           size="sm"
           onClick={() => {
+            // Clean up chat mode
             localStorage.removeItem('inChatMode');
+            
+            // Show bottom navigation
+            const bottomNav = document.querySelector('.bottom-nav');
+            if (bottomNav) {
+              (bottomNav as HTMLElement).style.display = 'flex';
+            }
+            
+            // Leave conversation room
+            if (socket && socket.connected && currentConversation) {
+              socket.emit("leave-conversation", currentConversation.id);
+            }
+            
+            // Clear conversation
             setCurrentConversation(null);
+            
+            // Navigate without refresh
+            setLocation('/social');
           }}
           className="p-2"
         >

@@ -46,7 +46,7 @@ export const HamburgerMenu = ({ isOpen, onClose }: HamburgerMenuProps) => {
     { icon: Layers, label: "Division", path: "/dashboard" },
     { icon: Medal, label: "Leaderboard", path: "/dashboard" },
     { icon: Trophy, label: "Tournament", path: "/dashboard" },
-    { icon: Users, label: "Social", path: "/dashboard" },
+    { icon: Users, label: "Social", path: "/social" },
     { icon: Store, label: "Store", path: "/dashboard" },
     { icon: User, label: "Profile", path: "/profile" },
     { icon: Settings, label: "Settings", path: "/dashboard" },

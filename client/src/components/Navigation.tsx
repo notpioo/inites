@@ -14,7 +14,9 @@ export const Navigation = ({ onHamburgerClick }: NavigationProps) => {
 
   // Hide navigation on home, login, register pages, and when in chat mode
   const isInChatMode = localStorage.getItem('inChatMode') === 'true';
-  if (location === "/" || location === "/login" || location === "/register" || isInChatMode) {
+  const shouldHideNavigation = location === "/" || location === "/login" || location === "/register" || isInChatMode;
+  
+  if (shouldHideNavigation) {
     return null;
   }
 

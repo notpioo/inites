@@ -1,6 +1,7 @@
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Home, Users, Trophy, MoreHorizontal } from "lucide-react";
+import { Home, Users, User, Trophy, Gamepad2, MoreHorizontal } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 interface BottomNavProps {
@@ -10,10 +11,32 @@ interface BottomNavProps {
 export const BottomNav = ({ onMoreClick }: BottomNavProps) => {
   const [location, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
+  const [isInChatMode, setIsInChatMode] = useState(false);
 
-  // Hide bottom navigation on login, register pages, and when in chat mode
-  const isInChatMode = localStorage.getItem('inChatMode') === 'true';
-  if (location === "/login" || location === "/register" || isInChatMode) {
+  // Check chat mode state
+  useEffect(() => {
+    const checkChatMode = () => {
+      setIsInChatMode(localStorage.getItem('inChatMode') === 'true');
+    };
+
+    checkChatMode();
+
+    // Listen for storage changes
+    window.addEventListener('storage', checkChatMode);
+
+    // Polling for local storage changes (for same tab)
+    const interval = setInterval(checkChatMode, 100);
+
+    return () => {
+      window.removeEventListener('storage', checkChatMode);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Hide on specific pages and when in chat mode
+  const shouldHideBottomNav = location === "/" || location === "/login" || location === "/register" || isInChatMode;
+
+  if (shouldHideBottomNav) {
     return null;
   }
 
@@ -30,6 +53,39 @@ export const BottomNav = ({ onMoreClick }: BottomNavProps) => {
     if (path !== "/" && location.startsWith(path)) return true;
     return false;
   };
+
+  // Check if we're in chat mode and hide bottom nav
+  useEffect(() => {
+    const checkChatMode = () => {
+      const isInChatMode = localStorage.getItem('inChatMode') === 'true';
+      const bottomNavElement = document.querySelector('.bottom-nav') as HTMLElement;
+      if (bottomNavElement) {
+        bottomNavElement.style.display = isInChatMode ? 'none' : 'flex';
+      }
+    };
+
+    checkChatMode();
+
+    // Check on storage changes (when chat mode changes)
+    window.addEventListener('storage', checkChatMode);
+
+    // Check on location changes
+    const checkOnLocationChange = () => {
+      setTimeout(checkChatMode, 100); // Small delay to ensure state is updated
+    };
+
+    // Listen for location changes
+    window.addEventListener('popstate', checkOnLocationChange);
+
+    // Also check periodically in case localStorage changes from same window
+    const interval = setInterval(checkChatMode, 500);
+
+    return () => {
+      window.removeEventListener('storage', checkChatMode);
+      window.removeEventListener('popstate', checkOnLocationChange);
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-secondary border-t border-border lg:hidden z-50 safe-area-bottom">

@@ -1,78 +1,75 @@
-
-import { useState } from "react";
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { 
+  Search, 
+  UserPlus, 
   Users, 
   MessageCircle, 
-  UserPlus, 
-  Search, 
+  Check, 
+  X, 
   Plus,
   Crown,
-  Circle,
-  X,
-  ChevronDown,
-  ChevronUp
+  Circle
 } from "lucide-react";
-import { useSocial } from "@/hooks/useSocial";
 import { useAuth } from "@/hooks/useAuth";
+import { useSocial } from "@/hooks/useSocial";
 import { useSocket } from "@/hooks/useSocket";
-import { sendFriendRequest, respondToFriendRequest, searchUsers, createGroup, createConversation } from "@/lib/firestore";
-import { useToast } from "@/hooks/use-toast";
-import { User } from "@shared/schema";
 import ChatWindow from "@/components/ChatWindow";
+import { 
+  sendFriendRequest, 
+  acceptFriendRequest, 
+  declineFriendRequest,
+  searchUsers,
+  createConversation,
+  createGroup,
+  joinGroup,
+  searchGroups
+} from "@/lib/firestore";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Social() {
+  const { currentUser } = useAuth();
   const { 
-    friendRequests, 
     friends, 
+    friendRequests, 
     groups, 
     conversations, 
-    currentConversation,
+    currentConversation, 
     setCurrentConversation,
     loading 
   } = useSocial();
-  const { currentUser } = useAuth();
   const { onlineUsers } = useSocket();
   const { toast } = useToast();
-  
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [activeTab, setActiveTab] = useState("chats");
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [groupName, setGroupName] = useState("");
-  const [groupDescription, setGroupDescription] = useState("");
-  const [isRequestsCollapsed, setIsRequestsCollapsed] = useState(false);
 
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) return;
-    
-    setIsSearching(true);
-    try {
-      const results = await searchUsers(searchTerm);
-      setSearchResults(results.filter(user => user.id !== currentUser?.uid));
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to search users",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSearching(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [activeTab, setActiveTab] = useState('friends');
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDescription, setNewGroupDescription] = useState('');
+  const [groupSearchQuery, setGroupSearchQuery] = useState('');
+  const [groupSearchResults, setGroupSearchResults] = useState<any[]>([]);
+
+  // Ensure bottom navigation is visible when on social page
+  useEffect(() => {
+    localStorage.removeItem('inChatMode');
+    const bottomNav = document.querySelector('.bottom-nav') as HTMLElement;
+    if (bottomNav) {
+      bottomNav.style.display = 'flex';
     }
-  };
+  }, []);
 
   const handleSendFriendRequest = async (toUserId: string) => {
     if (!currentUser) return;
-    
+
     try {
       await sendFriendRequest(currentUser.uid, toUserId);
       toast({
@@ -88,25 +85,59 @@ export default function Social() {
     }
   };
 
-  const handleFriendRequest = async (requestId: string, action: 'accepted' | 'declined') => {
+  const handleAcceptFriendRequest = async (requestId: string) => {
     try {
-      await respondToFriendRequest(requestId, action);
+      await acceptFriendRequest(requestId);
       toast({
         title: "Success",
-        description: `Friend request ${action}!`
+        description: "Friend request accepted!"
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: `Failed to ${action} friend request`,
+        description: "Failed to accept friend request",
         variant: "destructive"
       });
     }
   };
 
-  const handleStartChat = async (friendId: string) => {
+  const handleDeclineFriendRequest = async (requestId: string) => {
+    try {
+      await declineFriendRequest(requestId);
+      toast({
+        title: "Success",
+        description: "Friend request declined!"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to decline friend request",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSearchUsers = async () => {
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    try {
+      const results = await searchUsers(searchQuery);
+      setSearchResults(results.filter(user => user.id !== currentUser?.uid));
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to search users",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleCreateConversation = async (friendId: string) => {
     if (!currentUser) return;
-    
+
     // Check if conversation already exists
     const existingConv = conversations.find(conv => 
       conv.type === 'private' && 
@@ -119,7 +150,7 @@ export default function Social() {
     } else {
       try {
         const conversationId = await createConversation('private', [currentUser.uid, friendId]);
-        
+
         // Create a temporary conversation object
         const tempConversation = {
           id: conversationId,
@@ -129,9 +160,9 @@ export default function Social() {
           lastMessage: null,
           lastMessageAt: null
         };
-        
+
         setCurrentConversation(tempConversation);
-        
+
         toast({
           title: "Success",
           description: "Chat started!"
@@ -147,13 +178,12 @@ export default function Social() {
   };
 
   const handleCreateGroup = async () => {
-    if (!currentUser || !groupName.trim()) return;
+    if (!currentUser || !newGroupName.trim()) return;
 
     try {
-      await createGroup(groupName.trim(), groupDescription.trim(), currentUser.uid);
-      setGroupName("");
-      setGroupDescription("");
-      setShowCreateGroup(false);
+      await createGroup(newGroupName.trim(), newGroupDescription.trim(), currentUser.uid);
+      setNewGroupName('');
+      setNewGroupDescription('');
       toast({
         title: "Success",
         description: "Group created successfully!"
@@ -162,6 +192,39 @@ export default function Social() {
       toast({
         title: "Error",
         description: "Failed to create group",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleJoinGroup = async (groupId: string) => {
+    if (!currentUser) return;
+
+    try {
+      await joinGroup(groupId, currentUser.uid);
+      toast({
+        title: "Success",
+        description: "Joined group successfully!"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to join group",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSearchGroups = async () => {
+    if (!groupSearchQuery.trim()) return;
+
+    try {
+      const results = await searchGroups(groupSearchQuery);
+      setGroupSearchResults(results);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to search groups",
         variant: "destructive"
       });
     }
@@ -190,7 +253,7 @@ export default function Social() {
               <span className="hidden sm:inline">Add Friends</span>
               <span className="sm:hidden">Add</span>
             </Button>
-            <Dialog open={showCreateGroup} onOpenChange={setShowCreateGroup}>
+            <Dialog>
               <DialogTrigger asChild>
                 <Button size="sm" className="text-xs sm:text-sm">
                   <Plus className="w-4 h-4 mr-1 sm:mr-2" />
@@ -203,23 +266,19 @@ export default function Social() {
                   <DialogTitle>Create New Group</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <Input
-                    placeholder="Group name"
-                    value={groupName}
-                    onChange={(e) => setGroupName(e.target.value)}
+                  <Input 
+                    placeholder="Group name" 
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
                   />
-                  <Textarea
-                    placeholder="Group description (optional)"
-                    value={groupDescription}
-                    onChange={(e) => setGroupDescription(e.target.value)}
+                  <Textarea 
+                    placeholder="Group description (optional)" 
+                    value={newGroupDescription}
+                    onChange={(e) => setNewGroupDescription(e.target.value)}
                   />
                   <div className="flex gap-2 justify-end">
-                    <Button variant="outline" onClick={() => setShowCreateGroup(false)}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleCreateGroup} disabled={!groupName.trim()}>
-                      Create Group
-                    </Button>
+                    <Button variant="outline">Cancel</Button>
+                    <Button onClick={handleCreateGroup}>Create Group</Button>
                   </div>
                 </div>
               </DialogContent>
@@ -233,14 +292,9 @@ export default function Social() {
               <MessageCircle className="w-4 h-4" />
               <span>Chats</span>
             </TabsTrigger>
-            <TabsTrigger value="friends" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm relative">
+            <TabsTrigger value="friends" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm">
               <Users className="w-4 h-4" />
               <span>Friends</span>
-              {friendRequests.length > 0 && (
-                <Badge variant="destructive" className="absolute -top-1 -right-1 sm:relative sm:top-0 sm:right-0 sm:ml-1 text-xs min-w-[1rem] h-4 p-0 flex items-center justify-center">
-                  {friendRequests.length}
-                </Badge>
-              )}
             </TabsTrigger>
             <TabsTrigger value="groups" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm">
               <Users className="w-4 h-4" />
@@ -252,7 +306,6 @@ export default function Social() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Chats Tab */}
           <TabsContent value="chats" className="space-y-4">
             <Card>
               <CardHeader>
@@ -275,7 +328,7 @@ export default function Social() {
                         const isGroupChat = conversation.type === 'group';
                         const otherParticipant = !isGroupChat ? 
                           friends.find(f => f.firebaseUid === conversation.participants.find(p => p !== currentUser?.uid)) : null;
-                        
+
                         return (
                           <div 
                             key={conversation.id} 
@@ -318,84 +371,66 @@ export default function Social() {
             </Card>
           </TabsContent>
 
-          {/* Friends Tab */}
           <TabsContent value="friends" className="space-y-4">
-            {/* Friend Requests */}
             <Card>
               <CardHeader>
-                <div 
-                  className="flex items-center justify-between cursor-pointer"
-                  onClick={() => setIsRequestsCollapsed(!isRequestsCollapsed)}
-                >
-                  <CardTitle className="flex items-center gap-2">
-                    <UserPlus className="w-5 h-5" />
-                    Friend Requests
-                    {friendRequests.length > 0 && (
-                      <Badge variant="destructive">{friendRequests.length}</Badge>
-                    )}
-                  </CardTitle>
-                  {isRequestsCollapsed ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronUp className="w-4 h-4" />
-                  )}
-                </div>
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="w-5 h-5" />
+                  Friend Requests
+                </CardTitle>
               </CardHeader>
-              {!isRequestsCollapsed && (
-                <CardContent>
-                  {loading.friends ? (
-                    <div className="text-center py-8">Loading friend requests...</div>
-                  ) : friendRequests.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No pending friend requests
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-48">
-                      <div className="space-y-3">
-                        {friendRequests.map((request) => (
-                          <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                            <div className="flex items-center gap-3">
-                              <Avatar>
-                                <AvatarImage src={request.senderInfo?.profilePicture || ""} />
-                                <AvatarFallback>
-                                  {request.senderInfo?.fullName?.charAt(0).toUpperCase() || 'U'}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <p className="font-medium">
-                                  {request.senderInfo?.fullName || 'Unknown User'}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  @{request.senderInfo?.username || 'unknown'}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleFriendRequest(request.id, 'accepted')}
-                                className="bg-green-600 hover:bg-green-700"
-                              >
-                                Accept
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleFriendRequest(request.id, 'declined')}
-                              >
-                                Decline
-                              </Button>
+              <CardContent>
+                {loading.friends ? (
+                  <div className="text-center py-8">Loading friend requests...</div>
+                ) : friendRequests.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No pending friend requests
+                  </div>
+                ) : (
+                  <ScrollArea className="h-48">
+                    <div className="space-y-3">
+                      {friendRequests.map((request) => (
+                        <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarImage src={request.senderInfo?.profilePicture || ""} />
+                              <AvatarFallback>
+                                {request.senderInfo?.fullName?.charAt(0).toUpperCase() || 'U'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">
+                                {request.senderInfo?.fullName || 'Unknown User'}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                @{request.senderInfo?.username || 'unknown'}
+                              </p>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              )}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleAcceptFriendRequest(request.id)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeclineFriendRequest(request.id)}
+                            >
+                              Decline
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
             </Card>
 
-            {/* Friends List */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -438,7 +473,7 @@ export default function Social() {
                           </div>
                           <Button
                             size="sm"
-                            onClick={() => handleStartChat(friend.firebaseUid)}
+                            onClick={() => handleCreateConversation(friend.firebaseUid)}
                           >
                             <MessageCircle className="w-4 h-4 mr-2" />
                             Chat
@@ -452,7 +487,6 @@ export default function Social() {
             </Card>
           </TabsContent>
 
-          {/* Groups Tab */}
           <TabsContent value="groups" className="space-y-4">
             <Card>
               <CardHeader>
@@ -507,7 +541,6 @@ export default function Social() {
             </Card>
           </TabsContent>
 
-          {/* Search Tab */}
           <TabsContent value="search" className="space-y-4">
             <Card>
               <CardHeader>
@@ -520,11 +553,11 @@ export default function Social() {
                 <div className="flex gap-2">
                   <Input
                     placeholder="Search by username..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearchUsers()}
                   />
-                  <Button onClick={handleSearch} disabled={isSearching}>
+                  <Button onClick={handleSearchUsers} disabled={isSearching}>
                     <Search className="w-4 h-4" />
                   </Button>
                 </div>
