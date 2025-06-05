@@ -66,7 +66,9 @@ function App() {
     });
   }
 
-  const showNavigation = location !== "/";
+  // Check if we're in a chat room (when ChatWindow is displayed)
+  const isInChatMode = localStorage.getItem('inChatMode') === 'true';
+  const showNavigation = location !== "/" && !isInChatMode;
 
   return (
     <QueryClientProvider client={queryClient}>

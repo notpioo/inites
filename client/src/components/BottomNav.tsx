@@ -11,8 +11,9 @@ export const BottomNav = ({ onMoreClick }: BottomNavProps) => {
   const [location, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
 
-  // Hide bottom navigation on login and register pages
-  if (location === "/login" || location === "/register") {
+  // Hide bottom navigation on login, register pages, and when in chat mode
+  const isInChatMode = localStorage.getItem('inChatMode') === 'true';
+  if (location === "/login" || location === "/register" || isInChatMode) {
     return null;
   }
 
@@ -31,8 +32,8 @@ export const BottomNav = ({ onMoreClick }: BottomNavProps) => {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-secondary border-t border-border lg:hidden z-20">
-      <div className="flex items-center justify-around h-16">
+    <nav className="fixed bottom-0 left-0 right-0 bg-secondary border-t border-border lg:hidden z-50 safe-area-bottom">
+      <div className="flex items-center justify-around h-16 px-2">
         <Button
           variant="ghost"
           size="sm"

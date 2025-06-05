@@ -159,19 +159,29 @@ export const respondToFriendRequest = async (requestId: string, status: 'accepte
   }
 };
 
-export const getFriendRequests = (userId: string, callback: (requests: FriendRequest[]) => void) => {
+export const getFriendRequests = (userId: string, callback: (requests: any[]) => void) => {
   const q = query(
     collection(db, "friendRequests"),
     where("toUserId", "==", userId),
-    where("status", "==", "pending"),
-    orderBy("createdAt", "desc")
+    where("status", "==", "pending")
   );
 
-  return onSnapshot(q, (snapshot) => {
-    const requests = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as FriendRequest));
+  return onSnapshot(q, async (snapshot) => {
+    const requests = await Promise.all(
+      snapshot.docs.map(async (docSnap) => {
+        const requestData = docSnap.data();
+        // Get sender information
+        const senderRef = doc(db, "users", requestData.fromUserId);
+        const senderSnap = await getDoc(senderRef);
+        const senderData = senderSnap.exists() ? senderSnap.data() : null;
+        
+        return {
+          id: docSnap.id,
+          ...requestData,
+          senderInfo: senderData
+        };
+      })
+    );
     callback(requests);
   });
 };
@@ -189,19 +199,50 @@ export const getFriends = (userId: string, callback: (friends: User[]) => void) 
     where("status", "==", "active")
   );
 
-  // This is simplified - in practice you'd need to combine both queries
-  return onSnapshot(q1, async (snapshot) => {
-    const friendIds = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return data.user1Id === userId ? data.user2Id : data.user1Id;
-    });
+  // Listen to both queries and combine results
+  let friends1: User[] = [];
+  let friends2: User[] = [];
 
-    // Get friend profiles
-    const friends = await Promise.all(
-      friendIds.map(id => getUserProfile(id))
-    );
-    callback(friends.filter(Boolean) as User[]);
+  const unsubscribe1 = onSnapshot(q1, async (snapshot) => {
+    const friendIds = snapshot.docs.map(doc => doc.data().user2Id);
+    if (friendIds.length > 0) {
+      const friendsQuery = query(
+        collection(db, "users"),
+        where("firebaseUid", "in", friendIds)
+      );
+      const friendsSnapshot = await getDocs(friendsQuery);
+      friends1 = friendsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as User));
+    } else {
+      friends1 = [];
+    }
+    callback([...friends1, ...friends2]);
   });
+
+  const unsubscribe2 = onSnapshot(q2, async (snapshot) => {
+    const friendIds = snapshot.docs.map(doc => doc.data().user1Id);
+    if (friendIds.length > 0) {
+      const friendsQuery = query(
+        collection(db, "users"),
+        where("firebaseUid", "in", friendIds)
+      );
+      const friendsSnapshot = await getDocs(friendsQuery);
+      friends2 = friendsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as User));
+    } else {
+      friends2 = [];
+    }
+    callback([...friends1, ...friends2]);
+  });
+
+  return () => {
+    unsubscribe1();
+    unsubscribe2();
+  };
 };
 
 // Group System Functions
@@ -304,8 +345,7 @@ export const createConversation = async (type: 'private' | 'group', participants
 export const getUserConversations = (userId: string, callback: (conversations: any[]) => void) => {
   const q = query(
     collection(db, "conversations"),
-    where("participants", "array-contains", userId),
-    orderBy("lastMessageAt", "desc")
+    where("participants", "array-contains", userId)
   );
 
   return onSnapshot(q, (snapshot) => {
@@ -313,6 +353,19 @@ export const getUserConversations = (userId: string, callback: (conversations: a
       id: doc.id,
       ...doc.data()
     }));
+    
+    // Sort by lastMessageAt in memory
+    conversations.sort((a, b) => {
+      if (!a.lastMessageAt && !b.lastMessageAt) return 0;
+      if (!a.lastMessageAt) return 1;
+      if (!b.lastMessageAt) return -1;
+      
+      const aTime = a.lastMessageAt.toDate ? a.lastMessageAt.toDate() : new Date(a.lastMessageAt);
+      const bTime = b.lastMessageAt.toDate ? b.lastMessageAt.toDate() : new Date(b.lastMessageAt);
+      
+      return bTime.getTime() - aTime.getTime();
+    });
+    
     callback(conversations);
   });
 };

@@ -17,7 +17,9 @@ import {
   Plus,
   Crown,
   Circle,
-  X
+  X,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { useSocial } from "@/hooks/useSocial";
 import { useAuth } from "@/hooks/useAuth";
@@ -48,6 +50,7 @@ export default function Social() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
+  const [isRequestsCollapsed, setIsRequestsCollapsed] = useState(false);
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) return;
@@ -116,7 +119,19 @@ export default function Social() {
     } else {
       try {
         const conversationId = await createConversation('private', [currentUser.uid, friendId]);
-        // The conversation will be automatically loaded by the context
+        
+        // Create a temporary conversation object
+        const tempConversation = {
+          id: conversationId,
+          type: 'private' as const,
+          participants: [currentUser.uid, friendId],
+          createdAt: new Date(),
+          lastMessage: null,
+          lastMessageAt: null
+        };
+        
+        setCurrentConversation(tempConversation);
+        
         toast({
           title: "Success",
           description: "Chat started!"
@@ -156,32 +171,31 @@ export default function Social() {
 
   // Show chat window if conversation is selected
   if (currentConversation) {
-    return (
-      <div className="h-screen bg-background">
-        <ChatWindow />
-      </div>
-    );
+    return <ChatWindow />;
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 pb-20">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background text-foreground p-2 sm:p-4 content-with-bottom-nav">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Social</h1>
-          <div className="flex gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Social</h1>
+          <div className="flex gap-1 sm:gap-2">
             <Button
               variant="outline" 
               size="sm"
               onClick={() => setActiveTab("search")}
+              className="text-xs sm:text-sm"
             >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Add Friends
+              <UserPlus className="w-4 h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Add Friends</span>
+              <span className="sm:hidden">Add</span>
             </Button>
             <Dialog open={showCreateGroup} onOpenChange={setShowCreateGroup}>
               <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Group
+                <Button size="sm" className="text-xs sm:text-sm">
+                  <Plus className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">New Group</span>
+                  <span className="sm:hidden">Group</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -214,27 +228,27 @@ export default function Social() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="chats" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-4 h-auto p-1" style={{backgroundColor: 'rgb(55 65 81)'}}>
+            <TabsTrigger value="chats" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm">
               <MessageCircle className="w-4 h-4" />
-              Chats
+              <span>Chats</span>
             </TabsTrigger>
-            <TabsTrigger value="friends" className="flex items-center gap-2">
+            <TabsTrigger value="friends" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm relative">
               <Users className="w-4 h-4" />
-              Friends
+              <span>Friends</span>
               {friendRequests.length > 0 && (
-                <Badge variant="destructive" className="ml-1 text-xs">
+                <Badge variant="destructive" className="absolute -top-1 -right-1 sm:relative sm:top-0 sm:right-0 sm:ml-1 text-xs min-w-[1rem] h-4 p-0 flex items-center justify-center">
                   {friendRequests.length}
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="groups" className="flex items-center gap-2">
+            <TabsTrigger value="groups" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm">
               <Users className="w-4 h-4" />
-              Groups
+              <span>Groups</span>
             </TabsTrigger>
-            <TabsTrigger value="search" className="flex items-center gap-2">
+            <TabsTrigger value="search" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm">
               <Search className="w-4 h-4" />
-              Search
+              <span>Search</span>
             </TabsTrigger>
           </TabsList>
 
@@ -307,50 +321,79 @@ export default function Social() {
           {/* Friends Tab */}
           <TabsContent value="friends" className="space-y-4">
             {/* Friend Requests */}
-            {friendRequests.length > 0 && (
-              <Card>
-                <CardHeader>
+            <Card>
+              <CardHeader>
+                <div 
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => setIsRequestsCollapsed(!isRequestsCollapsed)}
+                >
                   <CardTitle className="flex items-center gap-2">
                     <UserPlus className="w-5 h-5" />
                     Friend Requests
-                    <Badge variant="destructive">{friendRequests.length}</Badge>
+                    {friendRequests.length > 0 && (
+                      <Badge variant="destructive">{friendRequests.length}</Badge>
+                    )}
                   </CardTitle>
-                </CardHeader>
+                  {isRequestsCollapsed ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronUp className="w-4 h-4" />
+                  )}
+                </div>
+              </CardHeader>
+              {!isRequestsCollapsed && (
                 <CardContent>
-                  <ScrollArea className="h-48">
-                    <div className="space-y-3">
-                      {friendRequests.map((request) => (
-                        <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Avatar>
-                              <AvatarFallback>
-                                {request.fromUserId.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium">Friend request received</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleFriendRequest(request.id, 'accepted')}
-                            >
-                              Accept
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleFriendRequest(request.id, 'declined')}
-                            >
-                              Decline
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                  {loading.friends ? (
+                    <div className="text-center py-8">Loading friend requests...</div>
+                  ) : friendRequests.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No pending friend requests
                     </div>
-                  </ScrollArea>
+                  ) : (
+                    <ScrollArea className="h-48">
+                      <div className="space-y-3">
+                        {friendRequests.map((request) => (
+                          <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                <AvatarImage src={request.senderInfo?.profilePicture || ""} />
+                                <AvatarFallback>
+                                  {request.senderInfo?.fullName?.charAt(0).toUpperCase() || 'U'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">
+                                  {request.senderInfo?.fullName || 'Unknown User'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  @{request.senderInfo?.username || 'unknown'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleFriendRequest(request.id, 'accepted')}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleFriendRequest(request.id, 'declined')}
+                              >
+                                Decline
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
                 </CardContent>
-              </Card>
-            )}
+              )}
+            </Card>
 
             {/* Friends List */}
             <Card>

@@ -1,7 +1,16 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Safe area support for mobile devices */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Ensure content doesn't go behind bottom navigation */
+.content-with-bottom-nav {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+}
 
 :root {
   --background: 31 41 55; /* #1f2937 - Dark gray background */
@@ -86,6 +95,30 @@
 
   .hamburger-menu.active {
     transform: translateX(0);
+  }
+
+  /* Custom tab styles */
+  [data-radix-tabs-trigger] {
+    transition: all 0.2s ease-in-out;
+    background-color: transparent !important;
+    border: 1px solid transparent !important;
+  }
+
+  [data-radix-tabs-trigger][data-state="active"] {
+    background-color: rgb(31 41 55) !important;
+    color: rgb(255 107 0) !important;
+    border-color: rgb(107 114 128) !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+
+  [data-radix-tabs-trigger]:not([data-state="active"]) {
+    color: rgb(156 163 175) !important;
+    background-color: rgb(55 65 81) !important;
+  }
+
+  [data-radix-tabs-trigger]:not([data-state="active"]):hover {
+    background-color: rgb(75 85 99) !important;
+    color: rgb(209 213 219) !important;
   }
 }
 
@@ -177,4 +210,34 @@ header {
 nav {
   background-color: rgb(55 65 81) !important;
   border-color: rgb(107 114 128) !important;
+}
+
+/* Bottom navigation styles */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--background);
+  border-top: 1px solid var(--border);
+  z-index: 50;
+}
+
+/* Chat window specific styles */
+.chat-window {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow: hidden;
+  padding-bottom: 80px; /* Space for sticky input on mobile */
+}
+
+@media (min-width: 768px) {
+  .chat-messages {
+    padding-bottom: 0;
+  }
 }

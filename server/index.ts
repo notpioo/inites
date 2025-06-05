@@ -53,31 +53,48 @@ app.use((req, res, next) => {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    socket.on("user-online", (userId: string) => {
+    // Handle user authentication and online status
+    socket.on("authenticate", (userId: string) => {
       onlineUsers.set(socket.id, userId);
+      socket.join(`user_${userId}`);
       io.emit("online-users", Array.from(onlineUsers.values()));
       log(`User ${userId} is now online`);
     });
 
     socket.on("join-conversation", (conversationId: string) => {
-      socket.join(conversationId);
+      socket.join(`conversation_${conversationId}`);
       log(`Socket ${socket.id} joined conversation ${conversationId}`);
     });
 
     socket.on("leave-conversation", (conversationId: string) => {
-      socket.leave(conversationId);
+      socket.leave(`conversation_${conversationId}`);
       log(`Socket ${socket.id} left conversation ${conversationId}`);
     });
 
+    // Handle new message
     socket.on("send-message", (data: {
       conversationId: string;
-      message: any;
+      messageId: string;
+      senderId: string;
+      content: string;
+      type: string;
+      createdAt: any;
     }) => {
-      socket.to(data.conversationId).emit("new-message", data.message);
+      console.log("Broadcasting message:", data);
+      // Broadcast to other users in conversation room
+      socket.to(`conversation_${data.conversationId}`).emit("new-message", {
+        id: data.messageId,
+        messageId: data.messageId,
+        conversationId: data.conversationId,
+        senderId: data.senderId,
+        content: data.content,
+        type: data.type || 'text',
+        createdAt: data.createdAt
+      });
     });
 
     socket.on("typing", (data: { conversationId: string; userId: string; isTyping: boolean }) => {
-      socket.to(data.conversationId).emit("user-typing", data);
+      socket.to(`conversation_${data.conversationId}`).emit("user-typing", data);
     });
 
     socket.on("disconnect", () => {

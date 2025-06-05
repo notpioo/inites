@@ -19,7 +19,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!currentUser) return;
 
-    const newSocket = io("http://localhost:5000", {
+    const newSocket = io(window.location.origin, {
       auth: {
         userId: currentUser.uid
       }
@@ -29,6 +29,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     newSocket.on("connect", () => {
       setIsConnected(true);
+      // Authenticate user when connected
+      newSocket.emit("authenticate", currentUser.uid);
       console.log("Connected to socket server");
     });
 
@@ -39,6 +41,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     newSocket.on("online-users", (users: string[]) => {
       setOnlineUsers(users);
+      console.log("Online users updated:", users);
     });
 
     return () => {
