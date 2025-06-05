@@ -1,14 +1,16 @@
-
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better caching
 COPY package*.json ./
-COPY tsconfig*.json ./
 
 # Install all dependencies
 RUN npm ci
+
+# Copy configuration files
+COPY tsconfig*.json ./
+COPY *.config.* ./
 
 # Copy source code
 COPY . .
