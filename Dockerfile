@@ -12,8 +12,11 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the client only
+RUN npm run build:client
+
+# Copy server files
+COPY server ./server
 
 # Remove devDependencies after build
 RUN npm ci --only=production && npm cache clean --force
